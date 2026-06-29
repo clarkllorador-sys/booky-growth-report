@@ -39,7 +39,8 @@ booky-growth-report/
 │   ├── report_YYYY-MM-DD.html   # Final report (gitignored — regenerate locally)
 │   └── report_YYYY-MM-DD.png    # Screenshot (gitignored)
 ├── scripts/
-│   └── generate_dummy_data.py   # Generates sample_report.html for preview
+│   ├── generate_dummy_data.py   # Generates sample_report.html for preview
+│   └── growth_report_monkey.py  # Python pipeline: fetches Tableau + GA4 data, builds report, posts to Slack
 └── pipeline_spec.md             # Full data engineering spec (schema, rules, column mapping)
 ```
 
@@ -78,9 +79,19 @@ Claude (running in Anthropic's Cowork desktop app) acts as the data orchestrator
 
 This approach is well-suited for metrics that require judgment calls (e.g. handling data gaps, GA4 ingestion delays, partial-week WTD logic) because the reasoning layer is the pipeline.
 
-### Python implementation (equivalent)
+### Python implementation (`growth_report_monkey.py`)
 
-The same pipeline can be built conventionally:
+`scripts/growth_report_monkey.py` is a self-contained Python script that runs the full pipeline end-to-end:
+
+1. Authenticates with Tableau via Personal Access Token and fetches three views (daily transactions, daily conversion funnel, weekly conversion funnel) as CSV
+2. Calls GA4 with named date ranges to get Web CR denominators for Latest / 1D / 7D / WTD without date-dimension deduplication issues
+3. Computes all metrics: GTV deltas, conversion rates per channel per period, ATV, merchant gainers/losers, and the Mon→Sun waterfall with future-day stubs
+4. Injects the resulting JSON into `MAIN_TEMPLATE.html` and writes the dated report HTML
+5. Builds a standalone version (React + JSX inlined) for screenshotting
+6. Triggers the Mac-side Playwright watcher to capture a PNG
+7. Posts to Slack: anchor message → PNG reply → HTML file reply
+
+The same pipeline can also be built with standard libraries:
 
 ```python
 # Data
