@@ -1,0 +1,18 @@
+# Generated reports — large files, regenerate locally
+outputs/report_*.html
+outputs/report_*.png
+
+# Temp build artifacts
+report_standalone.html
+screenshot_trigger_*.txt
+screenshot_done_*.txt
+screenshot_error_*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

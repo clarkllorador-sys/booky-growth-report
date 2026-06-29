@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Growth Report</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #f0f2f5; }
+    body { padding: 24px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       DATA INJECTION POINT — populate this JSON block only.
+       Do not modify any HTML, CSS, or JS outside this tag.
+  ══════════════════════════════════════════════════════════════ -->
+  <script id="report-data" type="application/json">
+  {
+    "meta": {
+      "generatedAt": "",
+      "source": "growth_raw_ds_v3",
+      "reportDate": "",
+      "reportDayLabel": "",
+      "prevDate": "",
+      "prevDayLabel": "",
+      "weekLabel": "",
+      "weekNumber": 0
+    },
+    "gtv": {
+      "current":  { "Total": 0, "App": 0, "Web": 0, "MP": 0 },
+      "vs1d":     { "Total": 0, "App": 0, "Web": 0, "MP": 0 },
+      "vs7d":     { "Total": 0, "App": 0, "Web": 0, "MP": 0 },
+      "wtd":      { "Total": 0, "App": 0, "Web": 0, "MP": 0 },
+      "target":   { "Total": 0, "App": 0, "Web": 0, "MP": 0 },
+      "daily": {
+        "Total": [0,0,0,0,0,0,0],
+        "App":   [0,0,0,0,0,0,0],
+        "Web":   [0,0,0,0,0,0,0],
+        "MP":    [0,0,0,0,0,0,0]
+      },
+      "future":    [false,false,false,false,false,false,false],
+      "days":      ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+      "dates":     ["","","","","","",""],
+      "wtdLabel":  "",
+      "conv": {
+        "App": { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 },
+        "Web": { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 },
+        "MP":  { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }
+      },
+      "convMock": { "Latest": false, "1D": false, "7D": false, "WTD": false },
+      "merchants": {
+        "Total": [{ "name": "", "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }],
+        "MP":    [{ "name": "", "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }],
+        "Web":   [{ "name": "", "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }],
+        "App":   [{ "name": "", "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }]
+      },
+      "merchantMock": { "Total": false, "MP": true, "Web": true, "App": true },
+      "atv": {
+        "MP":  { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 },
+        "Web": { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 },
+        "App": { "Latest": 0, "1D": 0, "7D": 0, "WTD": 0 }
+      },
+      "atvMock": false
+    }
+  }
+  </script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    /* ── load data ───────────────────────────────────────────── */
+    const DATA_RAW = JSON.parse(document.getElementById('report-data').textContent);
+    const RAW = {
+      meta:         DATA_RAW.meta,
+      current:      DATA_RAW.gtv.current,
+      vs1d:         DATA_RAW.gtv.vs1d,
+      vs7d:         DATA_RAW.gtv.vs7d,
+      wtd:          DATA_RAW.gtv.wtd,
+      target:       DATA_RAW.gtv.target,
+      daily:        DATA_RAW.gtv.daily,
+      future:       DATA_RAW.gtv.future,
+      days:         DATA_RAW.gtv.days,
+      dates:        DATA_RAW.gtv.dates,
+      wtdLabel:     DATA_RAW.gtv.wtdLabel,
+      conv:         DATA_RAW.gtv.conv,
+      convMock:     DATA_RAW.gtv.convMock,
+      merchants:    DATA_RAW.gtv.merchants,
+      merchantMock: DATA_RAW.gtv.merchantMock,
+      atv:          DATA_RAW.gtv.atv,
+      atvMock:      DATA_RAW.gtv.atvMock,
+    };
+
+    /* ── colour tokens ───────────────────────────────────────── */
+    const TEAL  = "#1A6B82";
+    const RED   = "#CC3A3A";
+    const GREEN = "#2E8B57";
+    const TXT   = "#1A2332";
+    const TXT2  = "#6B7D8D";
+    const TXT3  = "#9EACB6";
+    const BORD  = "#D8DFE5";
+    const BORD2 = "#f0f1f3";
+    const WHITE = "#ffffff";
+
+    const COL_APP  = "#F07020";
+    const COL_WEB  = "#22A24A";
+    const COL_MP   = "#0E87B0";
+
+    const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+
+    /* ── channel config ──────────────────────────────────────── */
+    const CHANNELS = [
+      { id: "Total", color: TEAL,    filled: false },
+      { id: "MP",    color: COL_MP,  filled: true  },
+      { id: "Web",   color: COL_WEB, filled: true  },
+      { id: "App",   color: COL_APP, filled: true  },
+    ];
+    const CHAN_COLORS = [
+      { id: "MP",  color: COL_MP  },
+      { id: "Web", color: COL_WEB },
+      { id: "App", color: COL_APP },
+    ];
+    const STACK_ORDER = ["App", "Web", "MP"];
+
+    /* ── derive REPORT_DATE_LABEL from dates (last non-future slot) ── */
+    const REPORT_DATE_LABEL = (() => {
+      const lastReal = RAW.future.reduce((acc, f, i) => (!f ? i : acc), 0);
+      return RAW.dates[lastReal] || "Latest";
+    })();
+
+    /* ── PERIODS — report date label replaces "Latest" ───────── */
+    const PERIODS = [REPORT_DATE_LABEL, "1D", "7D", "WTD"];
+
+    /* ── Compute CONTRIB from RAW ────────────────────────────── */
+    const pct = (v, total) => total === 0 ? 0 : Math.round((v / total) * 100);
+    const latestTotal = RAW.current.App + RAW.current.Web + RAW.current.MP;
+    const d1Total     = RAW.vs1d.App   + RAW.vs1d.Web   + RAW.vs1d.MP;
+    const d7Total     = RAW.vs7d.App   + RAW.vs7d.Web   + RAW.vs7d.MP;
+    const wtdTotal    = RAW.wtd.App    + RAW.wtd.Web    + RAW.wtd.MP;
+    const CONTRIB = {
+      [REPORT_DATE_LABEL]: { MP: pct(RAW.current.MP, latestTotal), Web: pct(RAW.current.Web, latestTotal), App: pct(RAW.current.App, latestTotal) },
+      "1D":                { MP: pct(RAW.vs1d.MP,    d1Total),     Web: pct(RAW.vs1d.Web,    d1Total),     App: pct(RAW.vs1d.App,    d1Total)     },
+      "7D":                { MP: pct(RAW.vs7d.MP,    d7Total),     Web: pct(RAW.vs7d.Web,    d7Total),     App: pct(RAW.vs7d.App,    d7Total)     },
+      WTD:                 { MP: pct(RAW.wtd.MP,      wtdTotal),    Web: pct(RAW.wtd.Web,      wtdTotal),    App: pct(RAW.wtd.App,      wtdTotal)    },
+    };
+
+    /* ── remap conv keys to use REPORT_DATE_LABEL ────────────── */
+    const CONV = {};
+    for (const ch of ["App","Web","MP"]) {
+      CONV[ch] = {
+        [REPORT_DATE_LABEL]: RAW.conv[ch]["Latest"] ?? 0,
+        "1D":  RAW.conv[ch]["1D"]  ?? 0,
+        "7D":  RAW.conv[ch]["7D"]  ?? 0,
+        "WTD": RAW.conv[ch]["WTD"] ?? 0,
+      };
+    }
+    const CONV_MOCK = {
+      [REPORT_DATE_LABEL]: RAW.convMock["Latest"] ?? false,
+      "1D":  RAW.convMock["1D"]  ?? true,
+      "7D":  RAW.convMock["7D"]  ?? true,
+      "WTD": RAW.convMock["WTD"] ?? true,
+    };
+
+    /* ── remap atv keys to use REPORT_DATE_LABEL ─────────────── */
+    const ATV = {};
+    for (const ch of ["App","Web","MP"]) {
+      ATV[ch] = {
+        [REPORT_DATE_LABEL]: RAW.atv[ch]["Latest"] ?? 0,
+        "1D":  RAW.atv[ch]["1D"]  ?? 0,
+        "7D":  RAW.atv[ch]["7D"]  ?? 0,
+        "WTD": RAW.atv[ch]["WTD"] ?? 0,
+      };
+    }
+
+    /* ── remap merchant keys to use REPORT_DATE_LABEL ────────── */
+    const MERCHANTS = {};
+    for (const src of ["Total","App","Web","MP"]) {
+      MERCHANTS[src] = (RAW.merchants[src] || []).map(m => ({
+        name: m.name,
+        [REPORT_DATE_LABEL]: m["Latest"] ?? m[REPORT_DATE_LABEL] ?? null,
+        "1D":  m["1D"]  ?? null,
+        "7D":  m["7D"]  ?? null,
+        "WTD": m["WTD"] ?? null,
+      }));
+    }
+    const MERCHANT_MOCK = RAW.merchantMock || { Total: false, MP: true, Web: true, App: true };
+
+    /* ── helpers ─────────────────────────────────────────────── */
+    const fmt = (v) => {
+      if (v == null) return "–";
+      if (v === 0)   return "₱0";
+      const abs = Math.abs(v);
+      if (abs >= 1_000_000) return `₱${(v/1_000_000).toFixed(1)}M`;
+      if (abs >= 1_000) { const k = v/1000; return `₱${Math.round(k*10)%10===0?(Math.round(k)).toString():k.toFixed(1)}K`; }
+      return `₱${Math.round(v)}`;
+    };
+    const pctDelta  = (cur, prev) => prev === 0 ? null : Math.round(((cur - prev) / prev) * 100);
+    const deltaCol  = (d) => d == null ? TXT2 : d >= 0 ? GREEN : RED;
+    const cumSum    = (arr) => arr.reduce((a, v, i) => { a.push(i === 0 ? v : a[i-1] + v); return a; }, []);
+
+    /* ── no-op placeholder (expand is now handled inline via React state) ── */
+    function openExpandedTable() {}
+
+    /* ══════════════════════════════════════════════════════════
+       SHARED LAYOUT COMPONENTS
+    ══════════════════════════════════════════════════════════ */
+    function SectionHeader({ children }) {
+      return (
+        <div style={{ background: TEAL, color: WHITE, padding: "9px 18px", fontSize: 15,
+          fontWeight: 600, borderRadius: "5px 5px 0 0", letterSpacing: 0.1, marginTop: 16 }}>
+          {children}
+        </div>
+      );
+    }
+    function CardBody({ children }) {
+      return (
+        <div style={{ border: `1px solid ${BORD}`, borderTop: "none",
+          borderRadius: "0 0 5px 5px", padding: "14px 18px 18px", background: WHITE }}>
+          {children}
+        </div>
+      );
+    }
+    function ExpandBtn({ label, onClick }) {
+      const [hov, setHov] = useState(false);
+      return (
+        <button onClick={onClick}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{ padding: "5px 14px", fontSize: 11.5, fontWeight: 600, fontFamily: FONT,
+            borderRadius: 4, cursor: "pointer", color: TEAL,
+            background: hov ? `${TEAL}18` : `${TEAL}0C`,
+            border: `1px solid ${hov ? TEAL+"55" : TEAL+"33"}`,
+            transition: "background 0.15s, border-color 0.15s" }}>
+          {label} ▸
+        </button>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       EXPANDED MERCHANT TABLE — full in-page view
+    ══════════════════════════════════════════════════════════ */
+    function ExpandedMerchantTable({ initialSrc, onBack }) {
+      const [curSrc, setCurSrc] = useState(initialSrc);
+
+      const chColor = CHANNELS.find(c => c.id === curSrc)?.color || TEAL;
+      // Always sorted by REPORT_DATE GTV desc (data already comes in this order)
+      const sorted = MERCHANTS[curSrc] || [];
+
+      const handleSrc = (src) => { setCurSrc(src); };
+
+      const thStyle = (col) => ({
+        textAlign: col === "name" ? "left" : "right",
+        fontWeight: 500,
+        color: col === "latest" ? chColor : TXT3,
+        fontSize: 10.5, padding: "10px 16px",
+        borderBottom: `1px solid ${BORD}`,
+        whiteSpace: "nowrap", letterSpacing: 0.3,
+        textTransform: "uppercase",
+        background: "#f7f9fa",
+      });
+
+      return (
+        <div style={{ fontFamily: FONT, maxWidth: 860, margin: "0 auto", background: WHITE }}>
+          <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+          {/* ── page header bar ── */}
+          <div style={{ background: TEAL, color: WHITE, padding: "12px 18px",
+            display: "flex", alignItems: "center", gap: 14,
+            borderRadius: "5px 5px 0 0", marginTop: 16 }}>
+            <button onClick={onBack} style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "4px 12px", fontSize: 11.5, fontWeight: 600, fontFamily: FONT,
+              borderRadius: 4, cursor: "pointer",
+              background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.35)",
+              color: WHITE }}>
+              ◂ Back to report
+            </button>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.1 }}>All Merchants by GTV</div>
+              <div style={{ fontSize: 10.5, opacity: 0.8, marginTop: 1 }}>
+                As of {REPORT_DATE_LABEL} · {sorted.length} merchants · sorted by date GTV
+              </div>
+            </div>
+          </div>
+
+          {/* ── card ── */}
+          <div style={{ border: `1px solid ${BORD}`, borderTop: "none",
+            borderRadius: "0 0 5px 5px", background: WHITE, overflow: "hidden" }}>
+
+            {/* source tabs row */}
+            <div style={{ padding: "10px 16px", borderBottom: `1px solid ${BORD}`,
+              display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: TXT2 }}>Source</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {CHANNELS.map(c => {
+                  const isActive = c.id === curSrc;
+                  return (
+                    <button key={c.id} onClick={() => handleSrc(c.id)} style={{
+                      padding: "3px 14px", fontSize: 11, fontWeight: 600, fontFamily: FONT,
+                      borderRadius: 4, cursor: "pointer",
+                      ...(!c.filled
+                        ? { background: WHITE, border: `1.5px solid ${c.color}`, color: c.color }
+                        : { background: c.color, border: `1.5px solid ${c.color}`, color: WHITE }),
+                      boxShadow: isActive ? `0 0 0 3px ${c.color}30, 0 2px 8px ${c.color}25` : "none",
+                      opacity: isActive ? 1 : 0.5,
+                      transition: "opacity 0.15s",
+                    }}>{c.id}</button>
+                  );
+                })}
+              </div>
+              <div style={{ flex: 1 }} />
+              <span style={{ fontSize: 10.5, color: TXT3 }}>{sorted.length} merchant{sorted.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            {/* table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle("rank"), width: 36, cursor: "default", color: TXT3, fontWeight: 400 }}></th>
+                    {[["name","Merchant"],["latest",REPORT_DATE_LABEL],["1d","1D"],["7d","7D"],["wtd","WTD"]].map(([col, label]) => (
+                      <th key={col} style={thStyle(col)}>
+                        {label}{col === "latest" ? " ▼" : ""}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((m, i) => {
+                    const vals = {
+                      latest: m[REPORT_DATE_LABEL],
+                      "1d": m["1D"],
+                      "7d": m["7D"],
+                      wtd: m["WTD"],
+                    };
+                    return (
+                      <tr key={m.name} style={{ background: i % 2 === 0 ? WHITE : "#fafbfc" }}>
+                        <td style={{ padding: "9px 16px", borderBottom: `0.5px solid ${BORD2}`,
+                          color: TXT3, fontSize: 10, width: 36, textAlign: "right" }}>{i + 1}</td>
+                        <td style={{ padding: "9px 16px", borderBottom: `0.5px solid ${BORD2}`,
+                          fontWeight: 500, color: TXT, whiteSpace: "nowrap" }}>
+                          {m.name}
+                        </td>
+                        {["latest","1d","7d","wtd"].map(col => {
+                          const v = vals[col];
+                          return (
+                            <td key={col} style={{
+                              padding: "9px 16px", borderBottom: `0.5px solid ${BORD2}`,
+                              textAlign: "right", whiteSpace: "nowrap",
+                              fontVariantNumeric: "tabular-nums",
+                              fontWeight: col === "latest" ? 700 : 400,
+                              color: v == null ? TXT3 : col === "latest" ? chColor : TXT2,
+                            }}>
+                              {v == null ? "–" : fmt(v)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+    function Divider({ vertical, margin }) {
+      return vertical
+        ? <div style={{ width: 1, alignSelf: "stretch", background: BORD, flexShrink: 0, margin: margin||"0 10px" }} />
+        : <div style={{ height: 1, background: BORD, margin: margin||"16px 0" }} />;
+    }
+    function MockTag() {
+      return (
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: 0.3, color: TXT3,
+          background: BORD2, border: `1px solid ${BORD}`, borderRadius: 3,
+          padding: "1px 5px", marginLeft: 6 }}>mock</span>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 1: LEFT CHART — today | vs 1d | vs 7d
+    ══════════════════════════════════════════════════════════ */
+    function LeftChart({ ch }) {
+      const W=208, H=360, BAR_W=52, GAP=18, BOT=298, CHART_H=240;
+      const bx = (i) => 4 + i * (BAR_W + GAP);
+      const bc = (i) => bx(i) + BAR_W / 2;
+      const cur = RAW.current[ch.id];
+      const d1  = RAW.vs1d[ch.id];
+      const d7  = RAW.vs7d[ch.id];
+      const dt1 = pctDelta(cur, d1);
+      const dt7 = pctDelta(cur, d7);
+      const mx  = Math.max(cur, d1, d7, 1);
+      const bh  = (v) => (v / mx) * CHART_H;
+      const by  = (v) => BOT - bh(v);
+      const bars = [{ val: cur, delta: null }, { val: d1, delta: dt1 }, { val: d7, delta: dt7 }];
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} width={208} height={360} style={{ display: "block", flexShrink: 0 }}>
+          <text x={bc(0)} y={18} textAnchor="middle" fontSize={14} fontWeight={700} fill={TXT} fontFamily={FONT}>{REPORT_DATE_LABEL}</text>
+          <text x={bc(1)} y={18} textAnchor="middle" fontSize={14} fontWeight={700} fill={deltaCol(dt1)} fontFamily={FONT}>{dt1!=null?(dt1>=0?"+":"")+dt1+"%":"–"}</text>
+          <text x={bc(2)} y={18} textAnchor="middle" fontSize={14} fontWeight={700} fill={deltaCol(dt7)} fontFamily={FONT}>{dt7!=null?(dt7>=0?"+":"")+dt7+"%":"–"}</text>
+          <text x={bc(1)} y={36} textAnchor="middle" fontSize={11.5} fill={TXT2} fontFamily={FONT}>vs 1d ago</text>
+          <text x={bc(2)} y={36} textAnchor="middle" fontSize={11.5} fill={TXT2} fontFamily={FONT}>vs 7d ago</text>
+          {bars.map((b, i) => (
+            <g key={i}>
+              <text x={bc(i)} y={by(b.val)-8} textAnchor="middle" fontSize={13.5} fontWeight={700} fill={TXT} fontFamily={FONT}>{fmt(b.val)}</text>
+              <rect x={bx(i)} y={by(b.val)} width={BAR_W} height={bh(b.val)} fill={ch.color} rx={2.5} opacity={i===0?1:0.5}/>
+            </g>
+          ))}
+          <line x1={0} y1={BOT} x2={W} y2={BOT} stroke={BORD} strokeWidth={1}/>
+        </svg>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 1: WATERFALL — weekly cumulative + WTD + gap + target
+    ══════════════════════════════════════════════════════════ */
+    function WaterfallChart({ ch }) {
+      const DAY_W=34, DAY_GAP=14, BIG_W=44, BIG_GAP=18, BOT=298, CHART_H=240;
+      const daily  = RAW.daily[ch.id];
+      const wtd    = RAW.wtd[ch.id];
+      const target = RAW.target[ch.id];
+      const gap    = Math.abs(target - wtd);
+      const above  = wtd >= target;
+      const cums   = cumSum(daily);
+      const maxVal = Math.max(target, wtd, 1);
+      const ry = (v) => BOT - (v / maxVal) * CHART_H;
+      const rh = (v) => (v / maxVal) * CHART_H;
+      const dx      = (i) => 4 + i * (DAY_W + DAY_GAP);
+      const dayEnd  = dx(6) + DAY_W;
+      const wtdX    = dayEnd + BIG_GAP;
+      const gapX    = wtdX + BIG_W + BIG_GAP;
+      const targetX = gapX + BIG_W + BIG_GAP;
+      const W = targetX + BIG_W + 4;
+      const H = 360;
+      const gapCol = above ? GREEN : RED;
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={360} style={{ display: "block" }}>
+          {daily.map((val, i) => {
+            const isFuture  = RAW.future[i];
+            const cumBefore = i === 0 ? 0 : cums[i-1];
+            const x = dx(i);
+            const barH = isFuture ? 0 : rh(val);
+            const barY = isFuture ? BOT : ry(cums[i]);
+            return (
+              <g key={`d${i}`}>
+                {i > 0 && !isFuture && (
+                  <line x1={dx(i-1)+DAY_W} y1={ry(cumBefore)} x2={x} y2={ry(cumBefore)}
+                    stroke="#B0BEC5" strokeWidth={1} strokeDasharray="4,2.5"/>
+                )}
+                {!isFuture && (
+                  <>
+                    <rect x={x} y={barY} width={DAY_W} height={barH} fill={ch.color} rx={2}/>
+                    <text x={x+DAY_W/2} y={barY-5} textAnchor="middle"
+                      fontSize={9.5} fontWeight={700} fill={TXT} fontFamily={FONT}>{fmt(val)}</text>
+                  </>
+                )}
+                <text x={x+DAY_W/2} y={BOT+14} textAnchor="middle"
+                  fontSize={10.5} fontWeight={500} fill={isFuture?TXT3:TXT2} fontFamily={FONT}>{RAW.days[i]}</text>
+                <text x={x+DAY_W/2} y={BOT+26} textAnchor="middle"
+                  fontSize={9} fontWeight={400} fill={TXT3} fontFamily={FONT}>{RAW.dates[i]}</text>
+              </g>
+            );
+          })}
+          <rect x={wtdX} y={ry(wtd)} width={BIG_W} height={rh(wtd)} fill={ch.color} rx={2.5}/>
+          <text x={wtdX+BIG_W/2} y={ry(wtd)-5} textAnchor="middle" fontSize={11.5} fontWeight={700} fill={TXT} fontFamily={FONT}>{fmt(wtd)}</text>
+          <text x={wtdX+BIG_W/2} y={BOT+14} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={TXT2} fontFamily={FONT}>WTD</text>
+          {(() => {
+            const gTop = above ? ry(wtd) : ry(target);
+            const gBot = above ? ry(target) : ry(wtd);
+            return (<>
+              <rect x={gapX} y={gTop} width={BIG_W} height={gBot-gTop} fill={gapCol} rx={2.5}/>
+              <text x={gapX+BIG_W/2} y={gTop-5} textAnchor="middle" fontSize={11.5} fontWeight={700} fill={gapCol} fontFamily={FONT}>{above?"+":" -"}{fmt(gap)}</text>
+            </>);
+          })()}
+          <text x={gapX+BIG_W/2} y={BOT+14} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={TXT2} fontFamily={FONT}>gap</text>
+          <rect x={targetX} y={ry(target)} width={BIG_W} height={rh(target)} fill={ch.color} rx={2.5} opacity={0.35}/>
+          <text x={targetX+BIG_W/2} y={ry(target)-5} textAnchor="middle" fontSize={11.5} fontWeight={700} fill={TXT} fontFamily={FONT}>{fmt(target)}</text>
+          <text x={targetX+BIG_W/2} y={BOT+14} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={TXT2} fontFamily={FONT}>target</text>
+          <line x1={0} y1={BOT} x2={W} y2={BOT} stroke={BORD} strokeWidth={1}/>
+        </svg>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 2A: STACKED CHANNEL CONTRIBUTION % — with legend
+    ══════════════════════════════════════════════════════════ */
+    function StackedContribution() {
+      const BAR_W=48, BAR_GAP=14, BOT=148, CHART_H=120;
+      const startX=6, colX=(i)=>startX+i*(BAR_W+BAR_GAP);
+      const W=colX(3)+BAR_W+4, H=170;
+      const colorOf=(id)=>CHAN_COLORS.find(c=>c.id===id).color;
+      return (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:TXT2, letterSpacing:0.2 }}>
+              Stacked Channel Contribution %
+            </span>
+            <div style={{ display:"flex", gap:10 }}>
+              {[...STACK_ORDER].reverse().map(id => (
+                <div key={id} style={{ display:"flex", alignItems:"center", gap:4 }}>
+                  <div style={{ width:8, height:8, borderRadius:2, background:colorOf(id), flexShrink:0 }}/>
+                  <span style={{ fontSize:10, fontWeight:500, color:TXT2 }}>{id}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:"block" }}>
+            {PERIODS.map((period, pi) => {
+              const x=colX(pi), row=CONTRIB[period], total=row.MP+row.Web+row.App;
+              const isLatest=pi===0;
+              let cy=BOT;
+              return (
+                <g key={period}>
+                  {STACK_ORDER.map((chId, si) => {
+                    const pctV=row[chId]/total, segH=pctV*CHART_H; cy-=segH;
+                    const isTop=si===STACK_ORDER.length-1, isBot=si===0;
+                    return (
+                      <g key={chId}>
+                        <rect x={x} y={cy} width={BAR_W} height={segH} fill={colorOf(chId)}
+                          rx={isTop||isBot?2.5:0} opacity={isLatest?1:0.72}/>
+                        {row[chId] > 0 && <text x={x+BAR_W/2} y={cy+segH/2+4} textAnchor="middle"
+                          fontSize={10} fontWeight={600} fill={WHITE} fontFamily={FONT}>{row[chId]}%</text>}
+                      </g>
+                    );
+                  })}
+                  <text x={x+BAR_W/2} y={BOT+16} textAnchor="middle"
+                    fontSize={10.5} fontWeight={500} fill={TXT3} fontFamily={FONT}>{period}</text>
+                </g>
+              );
+            })}
+            <line x1={startX-2} y1={BOT} x2={colX(3)+BAR_W+2} y2={BOT} stroke={BORD} strokeWidth={1}/>
+          </svg>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 2B: CONVERSION HEATMAP
+    ══════════════════════════════════════════════════════════ */
+    function ConversionHeatmap() {
+      const channels = CHAN_COLORS;
+      const allVals  = channels.flatMap(ch => PERIODS.map(p => CONV[ch.id][p]));
+      const nonZero  = allVals.filter(v => v > 0);
+      const minV = nonZero.length ? Math.min(...nonZero) : 0;
+      const maxV = nonZero.length ? Math.max(...nonZero) : 1;
+      const opFor = (v) => v===0 ? 0.12 : 0.50+0.40*((v-minV)/(maxV-minV||1));
+      const W=254, H=170, LW=40, CW=48, CH2=30, CG=5;
+      const CX=(i)=>LW+i*(CW+CG), RG=9, RS=42, RH=CH2+RG;
+      return (
+        <div>
+          <div style={{ fontSize:12, fontWeight:600, color:TXT2, marginBottom:8, letterSpacing:0.2 }}>
+            Conversion — Voucher Screen → Purchase %
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:"block" }}>
+            {PERIODS.map((p,i) => (
+              <g key={p}>
+                <text x={CX(i)+CW/2} y={28} textAnchor="middle" fontSize={10.5} fill={TXT3} fontFamily={FONT} fontWeight={500}>{p}</text>
+                {CONV_MOCK[p]&&<text x={CX(i)+CW/2} y={38} textAnchor="middle" fontSize={8} fill={TXT3} fontFamily={FONT} fontStyle="italic">mock</text>}
+              </g>
+            ))}
+            <line x1={LW} y1={42} x2={CX(3)+CW} y2={42} stroke={BORD} strokeWidth={0.5}/>
+            {channels.map((ch, ri) => {
+              const y=RS+ri*RH;
+              return (
+                <g key={ch.id}>
+                  <text x={0} y={y+CH2/2+5} fontSize={12} fontWeight={600} fill={ch.color} fontFamily={FONT}>{ch.id}</text>
+                  {PERIODS.map((p, ci) => {
+                    const val=CONV[ch.id][p], op=opFor(val);
+                    return (
+                      <g key={p}>
+                        <rect x={CX(ci)} y={y} width={CW} height={CH2} rx={4} fill={ch.color} opacity={op}/>
+                        <text x={CX(ci)+CW/2} y={y+CH2/2+5} textAnchor="middle"
+                          fontSize={11.5} fontWeight={600} fill={WHITE} fontFamily={FONT}>
+                          {val.toFixed(2)+"%"}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 2C: TOP MERCHANTS BY GTV
+       Local source filter + sort col + gainers/losers
+    ══════════════════════════════════════════════════════════ */
+    function TopMerchants({ activeId, onExpand }) {
+      const [localSrc, setLocalSrc]   = useState("Total");
+      const [sortCol, setSortCol]     = useState(REPORT_DATE_LABEL);
+      const [glPeriod, setGlPeriod]   = useState("7D");
+      const merchants = MERCHANTS[localSrc] || [];
+      const glMerchants = merchants;
+      const isMock    = MERCHANT_MOCK[localSrc];
+      const chColor   = CHANNELS.find(c=>c.id===localSrc)?.color || TEAL;
+      const cols      = [REPORT_DATE_LABEL, "1D", "7D", "WTD"];
+      const sorted    = [...merchants].sort((a,b)=>(b[sortCol]??-Infinity)-(a[sortCol]??-Infinity));
+      const top3      = sorted.slice(0,3);
+
+      const gainersLatest = glMerchants
+        .filter(m => m[REPORT_DATE_LABEL] != null && m[REPORT_DATE_LABEL] > 0 && m[REPORT_DATE_LABEL] > (m[glPeriod] || 0))
+        .map(m => ({
+          ...m,
+          delta: m[REPORT_DATE_LABEL] - (m[glPeriod] || 0),
+          pct: (m[glPeriod] != null && m[glPeriod] > 0)
+            ? Math.round(((m[REPORT_DATE_LABEL] - m[glPeriod]) / m[glPeriod]) * 100)
+            : null,
+        }))
+        .sort((a,b) => b.delta - a.delta);
+      const gainersWTD = gainersLatest.length < 3
+        ? glMerchants
+            .filter(m => (m[REPORT_DATE_LABEL] == null || m[REPORT_DATE_LABEL] === 0)
+              && m["WTD"] != null && m["WTD"] > 0
+              && m["WTD"] > (m[glPeriod] || 0)
+              && !gainersLatest.find(g => g.name === m.name))
+            .map(m => ({
+              ...m,
+              delta: m["WTD"] - (m[glPeriod] || 0),
+              pct: (m[glPeriod] != null && m[glPeriod] > 0)
+                ? Math.round(((m["WTD"] - m[glPeriod]) / m[glPeriod]) * 100)
+                : null,
+            }))
+            .filter(m => m.delta > 0)
+            .sort((a,b) => b.delta - a.delta)
+        : [];
+      const gainers = [...gainersLatest, ...gainersWTD].slice(0,3);
+
+      const losersActive = glMerchants
+        .filter(m => m[glPeriod] != null && m[glPeriod] > 0
+          && m[REPORT_DATE_LABEL] != null && m[REPORT_DATE_LABEL] >= 0
+          && m[REPORT_DATE_LABEL] < m[glPeriod])
+        .map(m => ({
+          ...m,
+          delta: m[REPORT_DATE_LABEL] - m[glPeriod],
+          pct: Math.round(((m[REPORT_DATE_LABEL] - m[glPeriod]) / m[glPeriod]) * 100),
+        }));
+      const losersDropped = glMerchants
+        .filter(m => (m[REPORT_DATE_LABEL] == null || m[REPORT_DATE_LABEL] === 0)
+          && ((m["1D"] != null && m["1D"] > 0) || (m["7D"] != null && m["7D"] > 0))
+          && !losersActive.find(l => l.name === m.name))
+        .map(m => {
+          const ref = m[glPeriod] != null && m[glPeriod] > 0 ? m[glPeriod]
+                    : m["1D"] != null && m["1D"] > 0 ? m["1D"]
+                    : m["7D"];
+          return { ...m, delta: -(ref), pct: -100 };
+        });
+      const losers = [...losersActive, ...losersDropped]
+        .sort((a,b) => a.delta - b.delta)
+        .slice(0,3);
+
+      return (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", marginBottom:8 }}>
+            <div style={{ display:"flex", alignItems:"center", flex:1 }}>
+              <span style={{ fontSize:12, fontWeight:600, color:TXT2, letterSpacing:0.2 }}>Top Merchants by GTV</span>
+              {isMock&&<MockTag/>}
+            </div>
+            <ExpandBtn label="Expand table" onClick={() => onExpand(localSrc)} />
+          </div>
+          <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+            {CHANNELS.map(c=>{
+              const isActive=c.id===localSrc;
+              return (
+                <button key={c.id} onClick={()=>setLocalSrc(c.id)} style={{
+                  padding:"3px 12px", fontSize:10.5, fontWeight:600, fontFamily:FONT,
+                  borderRadius:4, cursor:"pointer", transition:"all 0.2s ease",
+                  ...(!c.filled
+                    ?{background:WHITE,border:`1.5px solid ${c.color}`,color:c.color}
+                    :{background:c.color,border:`1.5px solid ${c.color}`,color:WHITE}),
+                  boxShadow:isActive?`0 0 0 3px ${c.color}30, 0 2px 8px ${c.color}25`:"none",
+                  opacity:isActive?1:0.55,
+                }}>{c.id}</button>
+              );
+            })}
+          </div>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11.5 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign:"left", fontWeight:500, color:TXT3, fontSize:10, padding:"0 0 4px",
+                  borderBottom:`0.5px solid ${BORD}`, width:"36%" }}>Merchant</th>
+                {cols.map(col=>(
+                  <th key={col} onClick={()=>setSortCol(col)} style={{
+                    textAlign:"right", fontSize:10, padding:"0 0 4px",
+                    borderBottom:`0.5px solid ${BORD}`, cursor:"pointer",
+                    fontWeight:col===sortCol?600:500,
+                    color:col===sortCol?chColor:TXT3,
+                  }}>{col}{col===sortCol?" ▼":""}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {top3.map((m,i)=>(
+                <tr key={m.name}>
+                  {[m.name,...cols.map(c=>m[c]!=null?fmt(m[c]):"–")].map((cell,ci)=>(
+                    <td key={ci} style={{
+                      padding:"6px 0",
+                      textAlign:ci===0?"left":"right",
+                      fontWeight:ci===0?500:(cols[ci-1]===sortCol?600:400),
+                      color:ci===0?TXT:(cols[ci-1]===sortCol?TXT:TXT2),
+                      borderBottom:i<2?`0.5px solid ${BORD2}`:"none",
+                      fontVariantNumeric:ci>0?"tabular-nums":"normal",
+                      overflow:ci===0?"hidden":"visible",
+                      textOverflow:ci===0?"ellipsis":"clip",
+                      whiteSpace:"nowrap", maxWidth:ci===0?120:"auto",
+                    }}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ height:0.5, background:BORD, margin:"10px 0" }}/>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+            <span style={{ fontSize:10, color:TXT3, fontWeight:500 }}>Compare:</span>
+            <div style={{ display:"flex", border:`1px solid ${BORD}`, borderRadius:3, overflow:"hidden" }}>
+              {["1D","7D"].map(p=>(
+                <button key={p} onClick={()=>setGlPeriod(p)} style={{
+                  padding:"3px 10px", fontSize:10, fontWeight:600, fontFamily:FONT,
+                  border:"none", cursor:"pointer",
+                  background:p===glPeriod?TEAL:WHITE,
+                  color:p===glPeriod?WHITE:TXT2,
+                  borderLeft:p==="7D"?`1px solid ${BORD}`:"none",
+                }}>vs {p}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:12 }}>
+            <div style={{ flex:1, minWidth:0, overflow:"hidden" }}>
+              <div style={{ fontSize:12, fontWeight:600, color:GREEN, marginBottom:4, letterSpacing:0.2 }}>Top 3 Gainers</div>
+              {gainers.length===0&&<div style={{ fontSize:11, color:TXT3, fontStyle:"italic" }}>None</div>}
+              {gainers.map((m,i)=>(
+                <div key={m.name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0",
+                  borderBottom:i<gainers.length-1?`0.5px solid ${BORD2}`:"none" }}>
+                  <span style={{ fontSize:11.5, fontWeight:500, color:TXT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0, marginRight:4 }}>{m.name}</span>
+                  <div style={{ textAlign:"right", flexShrink:0, minWidth:52 }}>
+                    <div style={{ fontSize:11.5, fontWeight:600, color:GREEN, fontVariantNumeric:"tabular-nums" }}>+{fmt(m.delta)}</div>
+                    <div style={{ fontSize:9.5, fontWeight:500, color:GREEN, fontVariantNumeric:"tabular-nums", opacity:0.85 }}>{m.pct != null ? `+${m.pct}%` : "–"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ flex:1, minWidth:0, overflow:"hidden" }}>
+              <div style={{ fontSize:12, fontWeight:600, color:RED, marginBottom:4, letterSpacing:0.2 }}>Top 3 Losers</div>
+              {losers.length===0&&<div style={{ fontSize:11, color:TXT3, fontStyle:"italic" }}>None</div>}
+              {losers.map((m,i)=>(
+                <div key={m.name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0",
+                  borderBottom:i<losers.length-1?`0.5px solid ${BORD2}`:"none" }}>
+                  <span style={{ fontSize:11.5, fontWeight:500, color:TXT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0, marginRight:4 }}>{m.name}</span>
+                  <div style={{ textAlign:"right", flexShrink:0, minWidth:52 }}>
+                    <div style={{ fontSize:11.5, fontWeight:600, color:RED, fontVariantNumeric:"tabular-nums" }}>{fmt(m.delta)}</div>
+                    <div style={{ fontSize:9.5, fontWeight:500, color:RED, fontVariantNumeric:"tabular-nums", opacity:0.85 }}>{m.pct != null ? `${m.pct}%` : "–"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SECTION 2D: AVG TRANSACTION VALUE HEATMAP
+    ══════════════════════════════════════════════════════════ */
+    function ATVHeatmap() {
+      const channels = CHAN_COLORS;
+      const totalAtv = RAW.atv["Total"] || {};
+      const allVals  = channels.flatMap(ch => PERIODS.map(p => ATV[ch.id][p])).filter(v => v != null && v > 0);
+      const minV = allVals.length ? Math.min(...allVals) : 0;
+      const maxV = allVals.length ? Math.max(...allVals) : 1;
+      const opFor = (v) => v===0 ? 0.12 : 0.50+0.40*((v-minV)/(maxV-minV||1));
+      const W=230, H=218, LW=38, CW=44, CH2=28, CG=4;
+      const CX=(i)=>LW+i*(CW+CG), RG=8, RS=28, RH=CH2+RG;
+      const totalY = RS;
+      const chanStart = totalY + RH + 4;
+      return (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", marginBottom:8 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:TXT2, letterSpacing:0.2 }}>Avg Transaction Value</span>
+            {RAW.atvMock&&<MockTag/>}
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:"block" }}>
+            {PERIODS.map((p,i)=>(
+              <text key={p} x={CX(i)+CW/2} y={14} textAnchor="middle" fontSize={10} fill={TXT3} fontFamily={FONT} fontWeight={500}>{p}</text>
+            ))}
+            <line x1={LW} y1={20} x2={CX(3)+CW} y2={20} stroke={BORD} strokeWidth={0.5}/>
+            <text x={0} y={totalY+CH2/2+4} fontSize={11.5} fontWeight={700} fill={TEAL} fontFamily={FONT}>Total</text>
+            {PERIODS.map((p,ci)=>{
+              const val = totalAtv[p === REPORT_DATE_LABEL ? "Latest" : p] ?? totalAtv[p] ?? 0;
+              const hasData = val != null && val > 0;
+              const op = hasData ? opFor(val) : 0.12;
+              return (
+                <g key={p}>
+                  <rect x={CX(ci)} y={totalY} width={CW} height={CH2} rx={4} fill={TEAL} opacity={op}/>
+                  <text x={CX(ci)+CW/2} y={totalY+CH2/2+4} textAnchor="middle"
+                    fontSize={10.5} fontWeight={700} fill={WHITE} fontFamily={FONT}>
+                    {hasData ? `₱${Math.round(val)}` : "–"}
+                  </text>
+                </g>
+              );
+            })}
+            <line x1={0} y1={chanStart-4} x2={W} y2={chanStart-4} stroke={BORD} strokeWidth={0.5}/>
+            {channels.map((ch,ri)=>{
+              const y=chanStart+ri*RH;
+              return (
+                <g key={ch.id}>
+                  <text x={0} y={y+CH2/2+4} fontSize={11.5} fontWeight={600} fill={ch.color} fontFamily={FONT}>{ch.id}</text>
+                  {PERIODS.map((p,ci)=>{
+                    const val=ATV[ch.id][p];
+                    const hasData = val != null && val > 0;
+                    const op = hasData ? opFor(val) : 0.12;
+                    return (
+                      <g key={p}>
+                        <rect x={CX(ci)} y={y} width={CW} height={CH2} rx={4} fill={ch.color} opacity={op}/>
+                        <text x={CX(ci)+CW/2} y={y+CH2/2+4} textAnchor="middle"
+                          fontSize={10.5} fontWeight={600} fill={WHITE} fontFamily={FONT}>
+                          {hasData ? `₱${Math.round(val)}` : "–"}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       MAIN COMPONENT
+    ══════════════════════════════════════════════════════════ */
+    function DGR() {
+      const [activeId, setActiveId]     = useState("Total");
+      const [expandedSrc, setExpandedSrc] = useState(null); // null = normal view, string = expanded merchant table
+      const ch = CHANNELS.find(c => c.id === activeId);
+
+      /* ── expanded view ── */
+      if (expandedSrc !== null) {
+        return (
+          <div style={{ fontFamily: FONT, background: "#f0f2f5", minHeight: "100vh", padding: 0, margin: "-24px" }}>
+            <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 20px 40px" }}>
+              <ExpandedMerchantTable
+                initialSrc={expandedSrc}
+                onBack={() => setExpandedSrc(null)}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div id="dgr-report" style={{ fontFamily:FONT, maxWidth:860, margin:"0 auto", background:WHITE }}>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+            @keyframes chartIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+          `}</style>
+
+          <div style={{ fontSize:20, fontWeight:700, color:TXT, padding:"14px 0 8px", textAlign:"center" }}>
+            Daily Growth Report · {RAW.meta.reportDayLabel}
+          </div>
+
+          {/* ── SECTION 1: GTV waterfall ── */}
+          <SectionHeader>GTV, progress towards weekly targets</SectionHeader>
+          <CardBody>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+              {CHANNELS.map(c => {
+                const isActive=c.id===activeId;
+                return (
+                  <button key={c.id} onClick={()=>setActiveId(c.id)} style={{
+                    padding:"5px 16px", fontSize:12, fontWeight:600, fontFamily:FONT,
+                    borderRadius:4, cursor:"pointer", transition:"all 0.2s ease",
+                    ...(!c.filled
+                      ?{background:WHITE,border:`1.5px solid ${c.color}`,color:c.color}
+                      :{background:c.color,border:`1.5px solid ${c.color}`,color:WHITE}),
+                    boxShadow:isActive?`0 0 0 3px ${c.color}30, 0 2px 8px ${c.color}25`:"none",
+                    opacity:isActive?1:0.55,
+                  }}>{c.id}</button>
+                );
+              })}
+              <div style={{ flex:1 }}/>
+              <ExpandBtn label="Expand chart" onClick={() => null} />
+            </div>
+            <div key={activeId} style={{ display:"flex", alignItems:"flex-end", animation:"chartIn 0.3s ease" }}>
+              <LeftChart ch={ch}/>
+              <Divider vertical/>
+              <div style={{ flex:1, minWidth:0 }}>
+                <WaterfallChart ch={ch}/>
+              </div>
+            </div>
+          </CardBody>
+
+          {/* ── SECTION 2: Channel & Merchant Contribution ── */}
+          <SectionHeader>GTV, Channel &amp; Merchant Contribution</SectionHeader>
+          <CardBody>
+            <div style={{ display:"flex", gap:0, alignItems:"stretch" }}>
+              <div style={{ flex:5, minWidth:0 }}><StackedContribution/></div>
+              <Divider vertical margin="0 14px"/>
+              <div style={{ flex:5, minWidth:0 }}><ConversionHeatmap/></div>
+            </div>
+
+            <Divider margin="16px 0"/>
+
+            <div style={{ display:"flex", gap:0, alignItems:"stretch" }}>
+              <div style={{ flex:5, minWidth:0 }}><TopMerchants activeId={activeId} onExpand={(src) => setExpandedSrc(src)}/></div>
+              <Divider vertical margin="0 14px"/>
+              <div style={{ flex:5, minWidth:0, display:"flex", flexDirection:"column", justifyContent:"center" }}><ATVHeatmap/></div>
+            </div>
+          </CardBody>
+
+          {/* footer */}
+          <div style={{ marginTop:8, fontSize:11, color:TXT2, display:"flex", justifyContent:"space-between" }}>
+            <span>
+              Source: {RAW.meta.source}
+              {RAW.meta.weekLabel ? ` · Week: ${RAW.meta.weekLabel}` : ""}
+            </span>
+            <span>
+              Generated by Claude {RAW.meta.generatedAt}
+              {RAW.meta.weekNumber ? ` · For questions and suggestions, please contact Raph / Clark` : ""}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<DGR/>);
+  </script>
+</body>
+</html>
